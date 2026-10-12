@@ -1,6 +1,7 @@
 import { getStore } from "@netlify/blobs";
 
-// 整张安排表存成一个 JSON 对象，键为 "日期_小时"
+// 每天 8:00–22:00，每 2 小时一格
+const SLOTS = [8, 10, 12, 14, 16, 18, 20];
 const STORE_NAME = "plans";
 const KEY = "calendar";
 
@@ -13,6 +14,15 @@ const cors = {
 
 const json = (payload, status = 200) =>
   new Response(JSON.stringify(payload), { status, headers: cors });
+
+const cleanPerson = (p) => {
+  p = p || {};
+  return {
+    what: String(p.what || "").slice(0, 100),
+    where: String(p.where || "").slice(0, 100),
+    who: String(p.who || "").slice(0, 100),
+  };
+};
 
 export default async (req) => {
   if (req.method === "OPTIONS") {
@@ -46,8 +56,8 @@ export default async (req) => {
         rows.push({
           date,
           hour,
-          activity: v.activity || "",
-          food: v.food || "",
+          me: v.me || { what: "", where: "", who: "" },
+          lin: v.lin || { what: "", where: "", who: "" },
           note: v.note || "",
         });
       }
@@ -63,13 +73,13 @@ export default async (req) => {
       const body = await req.json();
       const date = String(body.date || "");
       const hour = Number(body.hour);
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isInteger(hour)) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !SLOTS.includes(hour)) {
         return json({ error: "参数不对" }, 400);
       }
       data[`${date}_${hour}`] = {
-        activity: String(body.activity || "").slice(0, 100),
-        food: String(body.food || "").slice(0, 100),
-        note: String(body.note || "").slice(0, 1000),
+        me: cleanPerson(body.me),
+        lin: cleanPerson(body.lin),
+        note: String(body.note || "").slice(0, 2000),
         updated_at: new Date().toISOString(),
       };
       await store.set(KEY, JSON.stringify(data));
